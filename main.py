@@ -295,7 +295,7 @@ Port: 'your_port'
         print("\nInside the shell, prepare the environment and start ORDS:")
         print("  cd /opt/oracle/tools/ords")
         print("  source ~/.bashrc  # loads JAVA_HOME if you persisted it")
-        print("  $JAVA_HOME/bin/java -jar ords.war serve")
+        print("  ords --config /opt/oracle/ords_config serve")
         print("Keep this process running (use tmux/screen/nohup if you need it detached).")
 
         print("If you expose APEX through a proxy container, start it as well (example):")
@@ -303,6 +303,11 @@ Port: 'your_port'
 
         print("\nTo validate the database, you can still run:")
         print("  sqlplus / as sysdba")
+
+        print("\nAPEX access reminders:")
+        print("  - APEX builder: http://localhost:8080/ords/ (login with workspace credentials)")
+        print("  - APEX administration: http://localhost:8080/ords/apex_admin (user ADMIN)")
+        print("  - SQL Developer Web: choose PDB XEPDB1 on the landing page and sign in with a REST-enabled schema (for example APEX_PUBLIC_USER).")
 
         apex_url = project.get("apex_url") or "http://localhost:8080/ords"
         print(f"Access APEX at: {apex_url}")
@@ -428,7 +433,13 @@ Port: 'your_port'
         pending = self.db.list_projects(only_without_apex=True)
         if not pending:
             print("All projects are marked as APEX ready. Nice!")
-            return
+            force = input("Do you want to run the installer anyway? (Y/n): ").strip().lower()
+            if force not in {"", "y", "yes"}:
+                return
+            pending = self.db.list_projects()
+            if not pending:
+                print("No projects recorded yet. Create one first.")
+                return
 
         print("\nProjects without APEX installed:")
         self._print_projects_table(pending)

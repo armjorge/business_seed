@@ -258,6 +258,7 @@ class ApexInstallerHelper:
         java_hint = self._guess_java_home(java_archive)
         ords_home = "ords"
         apex_home = "apex"
+        ords_config_root = "/opt/oracle/ords_config"
 
         if sys.platform == "darwin":
             browser_command = f"open {apex_url}"
@@ -388,6 +389,19 @@ class ApexInstallerHelper:
         # Stage 2 – ORDS setup
         ords_steps = [
             InstallationStep(
+                title="Make ORDS CLI available",
+                context="Container shell",
+                description=(
+                    "Add the ords launcher to PATH for this session. Append the export to ~/.bashrc if you want every shell to include it automatically."
+                ),
+                commands=[
+                    f"cd {tools_folder}/{ords_home}",
+                    f"export PATH=\"$PATH:{tools_folder}/{ords_home}/bin\"",
+                    f"echo 'export PATH=\"$PATH:{tools_folder}/{ords_home}/bin\"' >> ~/.bashrc  # optional",
+                    "ords --version",
+                ],
+            ),
+            InstallationStep(
                 title="Review ORDS directory",
                 context="Container shell",
                 description=(
@@ -401,25 +415,55 @@ class ApexInstallerHelper:
                 ],
             ),
             InstallationStep(
-                title="Check ORDS version",
+                title="Prepare ORDS configuration directory",
                 context="Container shell",
                 description=(
-                    "Print the ORDS version to validate that the Java runtime can launch the installer."
+                    "Create a configuration folder outside the ORDS product path to avoid warnings. If you are retrying the install, move the previous config out of the way first."
                 ),
                 commands=[
-                    f"cd {tools_folder}/{ords_home}",
-                    "$JAVA_HOME/bin/java -jar ords.war version",
+                    "mv /opt/oracle/ords_config /opt/oracle/ords_config.bak.$(date +%Y%m%d%H%M%S) 2>/dev/null || true",
+                    f"mkdir -p {ords_config_root}",
+                    f"ls -ld {ords_config_root}",
                 ],
             ),
             InstallationStep(
                 title="Install ORDS",
                 context="Container shell",
                 description=(
-                    "Execute the ORDS installer in advanced mode to bind it to the XEPDB1 database. Use the SYS AS SYSDBA connection string when prompted."
+                    "Run the interactive installer. Select connection type 1 (Basic), enter host localhost, port 1521, and service XEPDB1. When prompted for administrator credentials use 'sys as sysdba' with the container password (JACJConsulting). On the summary screen edit option 3 to set a known password for ORDS_PUBLIC_USER, then accept the configuration."
                 ),
                 commands=[
                     f"cd {tools_folder}/{ords_home}",
-                    "$JAVA_HOME/bin/java -jar ords.war install advanced",
+                    f"ords --config {ords_config_root} install",
+                ],
+            ),
+            InstallationStep(
+                title="Sync ORDS runtime credentials",
+                context="Container shell",
+                description=(
+                    "Reset the ORDS and APEX REST users to the password you chose in the installer, then store it securely in the ORDS config. Replace <ords_password> with that value when running these commands."
+                ),
+                commands=[
+                    "sqlplus / as sysdba <<'EOF'",
+                    "ALTER SESSION SET CONTAINER = CDB$ROOT;",
+                    "ALTER USER ORDS_PUBLIC_USER IDENTIFIED BY \"<ords_password>\" ACCOUNT UNLOCK CONTAINER = ALL;",
+                    "ALTER SESSION SET CONTAINER = XEPDB1;",
+                    "ALTER USER APEX_PUBLIC_USER IDENTIFIED BY \"<ords_password>\" ACCOUNT UNLOCK;",
+                    "ALTER USER APEX_REST_PUBLIC_USER IDENTIFIED BY \"<ords_password>\" ACCOUNT UNLOCK;",
+                    "EXIT;",
+                    "EOF",
+                    f"ords --config {ords_config_root} config secret db.password",
+                    "# enter <ords_password> when prompted",
+                ],
+            ),
+            InstallationStep(
+                title="Enable PL/SQL gateway",
+                context="Container shell",
+                description=(
+                    "Turn on the PL/SQL gateway so /ords/apex and /ords/apex_admin respond."
+                ),
+                commands=[
+                    f"ords --config {ords_config_root} config set feature.plsql.gateway.enabled true",
                 ],
             ),
             InstallationStep(
@@ -430,8 +474,20 @@ class ApexInstallerHelper:
                 ),
                 commands=[
                     f"cd {tools_folder}/{ords_home}",
-                    "$JAVA_HOME/bin/java -jar ords.war serve",
+                    f"ords --config {ords_config_root} serve",
                     f"curl -I {apex_url.rstrip('/')}/_/",
+                ],
+            ),
+            InstallationStep(
+                title="Grant ORDS-enabled schema access",
+                context="Container shell",
+                description=(
+                    "Run the optional grant/enable tasks if you plan to use SQL Developer Web or REST endpoints for additional schemas."
+                ),
+                commands=[
+                    f"cd {tools_folder}/{ords_home}",
+                    f"ords --config {ords_config_root} grant-schema",
+                    f"ords --config {ords_config_root} enable-schema",
                 ],
             ),
         ]
