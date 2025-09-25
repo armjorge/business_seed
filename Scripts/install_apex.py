@@ -438,6 +438,16 @@ class ApexInstallerHelper:
                 ],
             ),
             InstallationStep(
+                title="Serve APEX static files",
+                context="Container shell",
+                description=(
+                    "Point ORDS to the APEX images directory so the /i/ prefix resolves. Update the standalone static path and keep it in sync with your APEX install folder."
+                ),
+                commands=[
+                    f"ords --config {ords_config_root} config set standalone.static.path {tools_folder}/{apex_home}/images",
+                ],
+            ),
+            InstallationStep(
                 title="Sync ORDS runtime credentials",
                 context="Container shell",
                 description=(
@@ -592,6 +602,17 @@ class ApexInstallerHelper:
                 commands=[
                     f"curl -I {apex_url}",
                     browser_command,
+                ],
+            ),
+            InstallationStep(
+                title="Create APEX workspace",
+                context="Host browser",
+                description=(
+                    "Open the administration interface and create your first workspace before using the builder."
+                ),
+                commands=[
+                    "# Open http://localhost:8080/ords/apex_admin",
+                    "# Sign in with ADMIN and the password provided to @apxchpwd.sql",
                 ],
             ),
         ]
