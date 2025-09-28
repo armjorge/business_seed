@@ -3,6 +3,7 @@ import re
 import subprocess
 from datetime import date
 from typing import Dict, List, Optional
+from dotenv import load_dotenv
 
 import yaml
 
@@ -14,7 +15,17 @@ class ProjectManagement:
     """Interactive helper to manage Oracle Docker containers and APEX setup."""
 
     def __init__(self) -> None:
-        self.folder_root = os.getcwd()
+        load_dotenv()  # carga .env si existe en el repo
+        main_path = os.getenv("MAIN_PATH", "root")
+        # Validar que el path exista, si no, usar root
+        if main_path == "root" or not os.path.exists(main_path):
+            self.folder_root = os.getcwd()
+            print(f"\tUsing current working directory as root: {os.path.basename(self.folder_root)}")
+            print("Create a .env file with MAIN_PATH=/Users/.../My Drive if need to set a custom path.")
+        else:
+            self.folder_root = main_path
+            print(f"\tPath from .env loaded, root set to: {os.path.basename(self.folder_root)}")
+
         self.working_folder = os.path.join(self.folder_root, "Local Data")
         os.makedirs(self.working_folder, exist_ok=True)
         self.yaml_path = os.path.join(self.working_folder, "config.yaml")
@@ -128,6 +139,8 @@ class ProjectManagement:
 Password: 'your_password'
 Host: 'your_host'
 Port: 'your_port'
+Main_path: 'root' # 'root' or specify a custom path /Users/armjorge/Library/CloudStorage/GoogleDrive-armjorge@gmail.com/My Drive/business_seed
+
 """
         if not os.path.exists(yaml_path):
             with open(yaml_path, "w", encoding="utf-8") as pointer:
