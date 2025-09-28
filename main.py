@@ -62,6 +62,8 @@ class ProjectManagement:
         print("If the Oracle XE image is missing, pull it with:")
         print("  docker pull gvenzl/oracle-xe:21-slim")
 
+        
+
         docker_command = (
             "docker run -d "
             "--platform linux/amd64 "
@@ -70,6 +72,7 @@ class ProjectManagement:
             "-p 1522:1521 "
             "-p 5501:5500 "
             "-p 8080:8080 "
+            "-v oracle_data:/opt/oracle/oradata "
             "gvenzl/oracle-xe:21-slim"
         )
 
